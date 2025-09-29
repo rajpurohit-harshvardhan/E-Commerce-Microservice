@@ -1,0 +1,9 @@
+env: "dev"
+http_server:
+  address: "localhost:8084"
+cockroach:
+  user: "root"
+  password: ""
+  host: '127.0.0.1'
+  port: 26257
+  dbname: "ecommerce_ms"
