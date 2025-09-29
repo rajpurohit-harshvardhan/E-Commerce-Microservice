@@ -10,9 +10,9 @@ import (
 )
 
 type Response struct {
-	Status string      `json:"status"`
-	Error  string      `json:"error"`
-	Result interface{} `json:"result"`
+	Status string      `json:"status,omitempty"`
+	Error  string      `json:"error,omitempty"`
+	Result interface{} `json:"result,omitempty"`
 }
 
 const (

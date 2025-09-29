@@ -7,12 +7,8 @@ import (
 	"order/internal/entities"
 	"strings"
 
-	//"errors"
 	"fmt"
-	//"log/slog"
 	"order/internal/config"
-	//"auth/internal/entities"
-	//"strings"
 	"time"
 
 	_ "github.com/lib/pq"

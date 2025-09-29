@@ -14,7 +14,6 @@ import (
 	"order/internal/db"
 
 	"common/utils/response"
-	//"order/internal/utils/response"
 
 	"github.com/go-playground/validator/v10"
 )
@@ -164,7 +163,7 @@ func GetOrderById(db db.Db) http.HandlerFunc {
 
 		order, err := db.GetOrderById(id)
 		if err != nil {
-			response.WriteJson(w, http.StatusNotFound, response.GeneralError(fmt.Errorf("auth not found")))
+			response.WriteJson(w, http.StatusNotFound, response.GeneralError(fmt.Errorf("order not found")))
 			return
 		}
 

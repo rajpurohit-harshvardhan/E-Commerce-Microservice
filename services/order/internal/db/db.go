@@ -2,8 +2,6 @@ package db
 
 import "order/internal/entities"
 
-//import "auth/internal/entities"
-
 type Db interface {
 	CreateOrder(userId string, status string, total float64) (string, error)
 	CreateOrderItems(orderItems []entities.OrderItem) (bool, error)

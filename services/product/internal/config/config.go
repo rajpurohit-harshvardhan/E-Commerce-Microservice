@@ -13,7 +13,7 @@ type HTTPServer struct {
 }
 
 type Cockroach struct {
-	User     string `yaml:"auth" env-required:"true"`
+	User     string `yaml:"user" env-required:"true"`
 	Password string `yaml:"password"`
 	Host     string `yaml:"host" env-required:"true"`
 	Port     int    `yaml:"port" env-required:"true"`
