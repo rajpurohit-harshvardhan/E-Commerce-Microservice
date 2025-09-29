@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"product/internal/db"
 	"product/internal/entities"
-	//"product/internal/utils/response"
 	"strconv"
 
 	"github.com/go-playground/validator/v10"
