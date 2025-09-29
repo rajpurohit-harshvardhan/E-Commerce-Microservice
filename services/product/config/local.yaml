@@ -1,6 +1,6 @@
 env: "dev"
 http_server:
-  address: "localhost:8082"
+  address: "localhost:8084"
 cockroach:
   user: "root"
   password: ""
