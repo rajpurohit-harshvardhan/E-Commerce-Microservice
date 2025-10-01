@@ -58,19 +58,20 @@ func New(cfg *config.Config) (*Postgres, error) {
 		return nil, err
 	}
 
-	//	_, err = db.Exec(`
-	//	CREATE TABLE IF NOT EXISTS refresh_tokens (
-	//  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-	//  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-	//  token_hash STRING NOT NULL,
-	//  expires_at TIMESTAMPTZ NOT NULL,
-	//  revoked BOOL DEFAULT false,
-	//  created_at TIMESTAMPTZ DEFAULT now()
-	//);
-	//`)
-	//	if err != nil {
-	//		return nil, err
-	//	}
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS refresh_tokens (
+	 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	 user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+	 token_hash STRING NOT NULL,
+	 issued_at TIMESTAMPTZ NOT NULL,
+	 expires_at TIMESTAMPTZ NOT NULL,
+	 revoked BOOL DEFAULT false,
+	 created_at TIMESTAMPTZ DEFAULT now()
+	);
+	`)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Postgres{
 		Db: db,
@@ -81,7 +82,7 @@ func (p *Postgres) CreateUser(name string, email string, passwordHash string) (s
 	var id string
 
 	err := p.Db.QueryRow(
-		`INSERT INTO orders (name, email, password_hash) VALUES ($1, $2, $3) RETURNING id`,
+		`INSERT INTO users (name, email, password_hash) VALUES ($1, $2, $3) RETURNING id`,
 		name, email, passwordHash).Scan(&id)
 
 	if err != nil {
@@ -122,9 +123,9 @@ func (p *Postgres) UpdateUserById(id string, detailsToUpdate map[string]interfac
 	}
 
 	validColumns := map[string]bool{
-		"name":         true,
-		"email":        true,
-		"passwordHash": true,
+		"name":          true,
+		"email":         true,
+		"password_hash": true,
 	}
 
 	var fields []string
@@ -155,7 +156,97 @@ func (p *Postgres) UpdateUserById(id string, detailsToUpdate map[string]interfac
 	rowsAffected, err := result.RowsAffected()
 	if err != nil || rowsAffected == 0 {
 		slog.Warn("failed to update user: ", err)
-		return false, fmt.Errorf("user not found or no changes made")
+		return false, fmt.Errorf("user not found or no changes made: %w", err)
+	}
+
+	return true, nil
+}
+
+func (p *Postgres) GetUserByEmail(email string) (entities.User, error) {
+	var user entities.User
+	err := p.Db.QueryRow("SELECT id, name, email, password_hash FROM users WHERE email=$1",
+		email).Scan(&user.ID, &user.Name, &user.Email, &user.PasswordHash)
+	if err != nil {
+		return user, err
+	}
+	return user, nil
+}
+
+// RefreshTokens Table
+func (p *Postgres) CreateRefreshToken(userId string, tokenHash string, expiresAt time.Time, issuedAt time.Time, revoked bool) (string, error) {
+	var id string
+
+	err := p.Db.QueryRow(
+		`INSERT INTO refresh_tokens (user_id, token_hash, expires_at, issued_at, revoked) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+		userId, tokenHash, expiresAt, issuedAt, revoked).Scan(&id)
+
+	if err != nil {
+		return "", err
+	}
+
+	return id, nil
+}
+
+func (p *Postgres) GetTokenByUserId(userId string) (entities.RefreshToken, error) {
+	var token entities.RefreshToken
+	err := p.Db.QueryRow("SELECT id, user_id, token_hash, expires_at, issued_at, revoked, created_at FROM refresh_tokens WHERE user_id=$1",
+		userId).Scan(&token.ID, &token.UserId, &token.TokenHash, &token.ExpiresAt, &token.IssuedAt, &token.Revoked, &token.CreatedAt)
+	if err != nil {
+		return token, err
+	}
+	return token, nil
+}
+
+func (p *Postgres) DeleteTokenById(id string) (bool, error) {
+	result, err := p.Db.Exec(`DELETE FROM refresh_tokens where id=$1`, id)
+	if err != nil {
+		return false, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil || rowsAffected == 0 {
+		slog.Warn("failed to delete token: ", err)
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func (p *Postgres) DeleteTokenByUserId(userId string) (bool, error) {
+	result, err := p.Db.Exec(`DELETE FROM refresh_tokens where user_id=$1`, userId)
+	if err != nil {
+		return false, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil || rowsAffected == 0 {
+		slog.Warn("failed to delete token: ", err)
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func (p *Postgres) GetTokenByHash(hash string) (entities.RefreshToken, error) {
+	var token entities.RefreshToken
+	err := p.Db.QueryRow("SELECT id, user_id, token_hash, expires_at, issued_at, revoked, created_at FROM refresh_tokens WHERE token_hash=$1",
+		hash).Scan(&token.ID, &token.UserId, &token.TokenHash, &token.ExpiresAt, &token.IssuedAt, &token.Revoked, &token.CreatedAt)
+	if err != nil {
+		return token, err
+	}
+	return token, nil
+}
+
+func (p *Postgres) DeleteTokenByHash(hash string) (bool, error) {
+	result, err := p.Db.Exec(`DELETE FROM refresh_tokens where token_hash=$1`, hash)
+	if err != nil {
+		return false, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil || rowsAffected == 0 {
+		slog.Warn("failed to delete token: ", err)
+		return false, nil
 	}
 
 	return true, nil

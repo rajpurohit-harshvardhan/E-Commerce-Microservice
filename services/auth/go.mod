@@ -23,6 +23,9 @@ require (
 	olympos.io/encoding/edn v0.0.0-20201019073823-d3554ca0b0a3 // indirect
 )
 
-require common v0.0.0
+require (
+	common v0.0.0
+	github.com/golang-jwt/jwt/v5 v5.3.0
+)
 
 replace common => ../../common

@@ -30,7 +30,7 @@ func New(db db.Db) http.HandlerFunc {
 
 		err := json.NewDecoder(request.Body).Decode(&product)
 		if errors.Is(err, io.EOF) {
-			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf("empty body")))
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf("empty body: %w", err)))
 			return
 		}
 

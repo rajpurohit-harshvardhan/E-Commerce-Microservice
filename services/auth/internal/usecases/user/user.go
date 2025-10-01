@@ -3,6 +3,7 @@ package user
 import (
 	"auth/internal/db"
 	"auth/internal/entities"
+	"common/utils/auth"
 	"common/utils/response"
 	"encoding/json"
 	"errors"
@@ -12,7 +13,6 @@ import (
 	"net/http"
 
 	"github.com/go-playground/validator/v10"
-	"golang.org/x/crypto/bcrypt"
 )
 
 func HealthCheck() http.HandlerFunc {
@@ -30,7 +30,7 @@ func New(db db.Db) http.HandlerFunc {
 
 		err := json.NewDecoder(request.Body).Decode(&user)
 		if errors.Is(err, io.EOF) {
-			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf("empty body")))
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf("empty body: %w", err)))
 			return
 		}
 
@@ -45,8 +45,7 @@ func New(db db.Db) http.HandlerFunc {
 			return
 		}
 
-		// TODO: code to convert password into hash
-		passwordHash, err := HashPassword(user.Password)
+		passwordHash, err := auth.CreateHash(user.Password)
 		if err != nil {
 			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(err))
 			return
@@ -59,40 +58,10 @@ func New(db db.Db) http.HandlerFunc {
 			return
 		}
 
-		slog.Info(`CreateOrder :: User created successfully :`, slog.String("id", id))
+		slog.Info(`CreateUser :: User created successfully :`, slog.String("id", id))
 		response.WriteJson(writer, http.StatusOK, response.GeneralResponse(map[string]string{"id": id}))
 	}
 }
-
-//func ListOrders(db db.Db) http.HandlerFunc {
-//	return func(writer http.ResponseWriter, request *http.Request) {
-//		slog.Info(`ListOrders :: start`)
-//
-//		queryParams := request.URL.Query()
-//		limit := 10
-//		if v := queryParams.Get("limit"); v != "" {
-//			if n, _ := strconv.Atoi(v); n > 0 && n <= 100 {
-//				limit = n
-//			}
-//		}
-//		offset := 0
-//		if v := queryParams.Get("offset"); v != "" {
-//			if n, _ := strconv.Atoi(v); n >= 0 {
-//				offset = n
-//			}
-//		}
-//
-//		orders, err := db.ListOrders(limit, offset)
-//
-//		if err != nil {
-//			slog.Error("error getting orders", err.Error())
-//			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(err))
-//			return
-//		}
-//		slog.Info(`ListOrders :: End`)
-//		response.WriteJson(writer, http.StatusOK, response.GeneralResponse(orders))
-//	}
-//}
 
 func DeleteUserById(db db.Db) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
@@ -111,7 +80,7 @@ func DeleteUserById(db db.Db) http.HandlerFunc {
 		}
 
 		if !ok {
-			response.WriteJson(writer, http.StatusNotFound, response.GeneralError(fmt.Errorf("user not found")))
+			response.WriteJson(writer, http.StatusNotFound, response.GeneralError(fmt.Errorf("user not found: %w", err)))
 			return
 		}
 
@@ -133,7 +102,7 @@ func GetUserById(db db.Db) http.HandlerFunc {
 
 		user, err := db.GetUserById(id)
 		if err != nil {
-			response.WriteJson(w, http.StatusNotFound, response.GeneralError(fmt.Errorf("user not found")))
+			response.WriteJson(w, http.StatusNotFound, response.GeneralError(fmt.Errorf("user not found: %w", err)))
 			return
 		}
 
@@ -150,12 +119,13 @@ func UpdateUserById(db db.Db) http.HandlerFunc {
 		id := request.PathValue("id")
 		if id == "" {
 			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(nil))
+			return
 		}
 
 		var user map[string]interface{}
 		err := json.NewDecoder(request.Body).Decode(&user)
 		if errors.Is(err, io.EOF) {
-			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf("empty body")))
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf("empty body: %w", err)))
 			return
 		}
 
@@ -164,7 +134,7 @@ func UpdateUserById(db db.Db) http.HandlerFunc {
 			return
 		}
 
-		var detailsToUpdate map[string]interface{}
+		detailsToUpdate := make(map[string]interface{})
 		if v, ok := user["email"]; ok {
 			detailsToUpdate["email"] = v
 		}
@@ -185,12 +155,12 @@ func UpdateUserById(db db.Db) http.HandlerFunc {
 				return
 			}
 
-			hashPassword, err1 := HashPassword(passwordString)
+			hashPassword, err1 := auth.CreateHash(passwordString)
 			if err1 != nil {
 				response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(err1))
 				return
 			}
-			detailsToUpdate["passwordHash"] = hashPassword
+			detailsToUpdate["password_hash"] = hashPassword
 		}
 
 		result, err := db.UpdateUserById(id, detailsToUpdate)
@@ -199,17 +169,7 @@ func UpdateUserById(db db.Db) http.HandlerFunc {
 			return
 		}
 
-		slog.Info(`UpdateUserById :: Order updated successfully :`, slog.String("id", id))
+		slog.Info(`UpdateUserById :: user updated successfully :`, slog.String("id", id))
 		response.WriteJson(writer, http.StatusOK, map[string]interface{}{"id": id, "result": result})
 	}
-}
-
-func HashPassword(password string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	return string(bytes), err
-}
-
-func CheckPasswordHash(password, hash string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
-	return err == nil
 }

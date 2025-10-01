@@ -2,7 +2,9 @@ package router
 
 import (
 	"auth/internal/db"
+	"auth/internal/usecases/auth"
 	"auth/internal/usecases/user"
+	"common/utils/http/middleware"
 	"net/http"
 )
 
@@ -12,10 +14,16 @@ func SetupRouter(db db.Db) *http.ServeMux {
 	router.HandleFunc("GET /", user.HealthCheck())
 	router.HandleFunc("GET /health", user.HealthCheck())
 	router.HandleFunc("GET /health-check", user.HealthCheck())
+	authOnly := middleware.Authenticated
 
-	router.HandleFunc("POST /v1/user", user.New(db))
-	router.HandleFunc("DELETE /v1/user/{id}", user.DeleteUserById(db))
-	router.HandleFunc("GET /v1/user/{id}", user.GetUserById(db))
-	router.HandleFunc("PUT /v1/user/{id}", user.UpdateUserById(db))
+	//router.HandleFunc("POST /v1/user", user.New(db))
+	router.Handle("DELETE /v1/user/{id}", authOnly(user.DeleteUserById(db)))
+	router.Handle("GET /v1/user/{id}", authOnly(user.GetUserById(db)))
+	router.Handle("PUT /v1/user/{id}", authOnly(user.UpdateUserById(db)))
+
+	router.HandleFunc("POST /v1/user/register", user.New(db))
+	router.HandleFunc("POST /v1/user/login", auth.Login(db))
+	router.Handle("POST /v1/user/refresh", authOnly(auth.RefreshTokens(db)))
+	router.HandleFunc("POST /v1/user/logout", auth.Logout(db))
 	return router
 }
