@@ -2,7 +2,9 @@ package postgres
 
 import (
 	"auth/internal/entities"
+	"common/utils/migrate"
 	"database/sql"
+	"embed"
 	"errors"
 	"log/slog"
 	"strings"
@@ -17,6 +19,8 @@ import (
 type Postgres struct {
 	Db *sql.DB
 }
+
+var embedMigrations embed.FS
 
 func New(cfg *config.Config) (*Postgres, error) {
 	// Build connection string
@@ -44,33 +48,17 @@ func New(cfg *config.Config) (*Postgres, error) {
 		return nil, err
 	}
 
-	// table creation
-	_, err = db.Exec(`
-	CREATE TABLE IF NOT EXISTS users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name STRING,
-  email STRING UNIQUE NOT NULL,
-  password_hash STRING NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);`)
-	if err != nil {
-		return nil, err
-	}
+	// Running migrations
+	if err := migrate.Run(db, embedMigrations, "."); err != nil {
 
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS refresh_tokens (
-	 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-	 user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-	 token_hash STRING NOT NULL,
-	 issued_at TIMESTAMPTZ NOT NULL,
-	 expires_at TIMESTAMPTZ NOT NULL,
-	 revoked BOOL DEFAULT false,
-	 created_at TIMESTAMPTZ DEFAULT now()
-	);
-	`)
-	if err != nil {
-		return nil, err
+		if strings.Contains(err.Error(), "no migration files found") {
+			slog.Warn("migrations: none found; continuing")
+		} else {
+			_ = db.Close()
+			slog.Info("AUTH SERVICEE!@!!!!!")
+			fmt.Print("ASDASDASDASd")
+			return nil, fmt.Errorf("migrations failed: %w", err)
+		}
 	}
 
 	return &Postgres{

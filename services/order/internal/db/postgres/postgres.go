@@ -1,7 +1,9 @@
 package postgres
 
 import (
+	"common/utils/migrate"
 	"database/sql"
+	"embed"
 	"errors"
 	"log/slog"
 	"order/internal/entities"
@@ -17,6 +19,8 @@ import (
 type Postgres struct {
 	Db *sql.DB
 }
+
+var embedMigrations embed.FS
 
 func New(cfg *config.Config) (*Postgres, error) {
 	// Build connection string
@@ -44,30 +48,10 @@ func New(cfg *config.Config) (*Postgres, error) {
 		return nil, err
 	}
 
-	// table creation
-	_, err = db.Exec(`
-	CREATE TABLE IF NOT EXISTS orders (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL,
-  status STRING NOT NULL, -- CONFIRMED, CANCELLED
-  total DECIMAL(10,2) NOT NULL,
-  created_at TIMESTAMPTZ DEFAULT now(),
-  updated_at TIMESTAMPTZ DEFAULT now()
-);`)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = db.Exec(`
-	CREATE TABLE IF NOT EXISTS order_items (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  product_id UUID NOT NULL,
-  quantity INT8 NOT NULL,
-  price DECIMAL(10,2) NOT NULL);
-`)
-	if err != nil {
-		return nil, err
+	// Running migrations
+	if err := migrate.Run(db, embedMigrations, "."); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf("migrations failed: %w", err)
 	}
 
 	return &Postgres{

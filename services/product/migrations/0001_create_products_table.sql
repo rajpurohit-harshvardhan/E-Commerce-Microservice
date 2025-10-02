@@ -1,3 +1,4 @@
+-- +goose Up
 CREATE TABLE IF NOT EXISTS products (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     sku STRING UNIQUE NOT NULL,
@@ -8,3 +9,6 @@ CREATE TABLE IF NOT EXISTS products (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
+
+-- +goose Down
+DROP TABLE IF EXISTS products;

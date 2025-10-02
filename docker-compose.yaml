@@ -1,0 +1,64 @@
+version: "3.9"
+services:
+  cockroachdb:
+    image: cockroachdb/cockroach:v25.3.2
+    command: ["start-single-node", "--insecure", "--accept-sql-without-tls"]
+    ports:
+      - "26257:26257"
+      - "8080:8080"
+    volumes:
+      - cockroach-data:/cockroach/cockroach-data
+    healthcheck:
+      test: ["CMD", "cockroach", "node", "status", "--insecure", "--host=localhost:26257"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  db-init:
+    image: cockroachdb/cockroach:v25.3.2
+    depends_on:
+      cockroachdb:
+        condition: service_healthy
+    command: ["sql", "--insecure", "--host=cockroachdb:26257",
+              "--execute", "CREATE DATABASE IF NOT EXISTS ecommerce_ms;"]
+    restart: "no"
+
+  auth:
+    build:
+      context: .
+      dockerfile: services/auth/Dockerfile
+    environment:
+      - MIGRATION_ACTION=up
+    depends_on:
+      cockroachdb:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+
+
+  order:
+    build:
+      context: .
+      dockerfile: services/order/Dockerfile
+    environment:
+      - MIGRATION_ACTION=up
+    depends_on:
+      cockroachdb:
+        condition: service_healthy
+    ports:
+      - "8083:8083"
+
+  product:
+    build:
+      context: .
+      dockerfile: services/product/Dockerfile
+    environment:
+      - MIGRATION_ACTION=up
+    depends_on:
+      cockroachdb:
+        condition: service_healthy
+    ports:
+      - "8084:8084"
+
+volumes:
+  cockroach-data:
