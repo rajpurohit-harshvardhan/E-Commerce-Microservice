@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: order-config
+  namespace: ecommerce-ms
+data:
+  config.yaml: |
+    env: "dev"
+    http_server:
+      address: "0.0.0.0:8083"
+    cockroach:
+      user: "root"
+      password: ""
+      host: "cockroachdb"
+      port: 26257
+      dbname: "ecommerce_ms"
