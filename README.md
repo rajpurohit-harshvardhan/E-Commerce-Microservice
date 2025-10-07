@@ -31,8 +31,6 @@ All services expose **REST APIs** and are independently deployable using **Docke
 - **CockroachDB** – distributed SQL database
 - **Docker** – containerization
 - **Kubernetes** – orchestration and deployment
-- **REST API** – communication between services
-- **JWT** – secure authentication
 
 ---
 
@@ -92,8 +90,7 @@ These shared components are imported by each microservice for consistent behavio
 The **`misc/`** folder contains helper files for testing, verification, and API documentation.
 
 - **`test.sh`** → Automated end-to-end testing script covering complete system behavior.
-- **`routes.json`** → Postman collection containing all API endpoints (Auth, Product, Order).  
-  Import this file into Postman to view and test all routes with example requests/responses.
+- **`routes.json`** → Postman collection containing all API endpoints (Auth, Product, Order).
 ---
 
 ## ● Docker Setup
