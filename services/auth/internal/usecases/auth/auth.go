@@ -30,7 +30,7 @@ func Login(db db.Db) http.HandlerFunc {
 		}
 
 		if err != nil {
-			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(err))
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf(" Error while decoding request body : %w", err)))
 			return
 		}
 
@@ -55,13 +55,13 @@ func Login(db db.Db) http.HandlerFunc {
 		accessTokenExpiresAt := time.Now().Add(time.Hour * 2)
 		accessToken, err := auth.CreateToken(userDetails.ID, "access", accessTokenExpiresAt)
 		if err != nil {
-			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf("Error creating token: %w", err)))
+			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf("Error generating accesstoken: %w", err)))
 			return
 		}
 
 		refreshToken, err := auth.GenerateRefreshToken()
 		if err != nil {
-			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf("Error creating token: %w", err)))
+			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf("Error generating refreshtoken: %w", err)))
 			return
 		}
 		refreshTokenExpiresAt := time.Now().Add(time.Hour * 24 * 7)
@@ -95,7 +95,7 @@ func RefreshTokens(db db.Db) http.HandlerFunc {
 		}
 
 		if err != nil {
-			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(err))
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf(" Error while decoding request body : %w", err)))
 			return
 		}
 
@@ -133,13 +133,13 @@ func RefreshTokens(db db.Db) http.HandlerFunc {
 		accessTokenExpiresAt := time.Now().Add(time.Hour * 2)
 		accessToken, err := auth.CreateToken(token.UserId, "access", accessTokenExpiresAt)
 		if err != nil {
-			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf("Error creating token: %w", err)))
+			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf(" Error generating accesstoken: %w", err)))
 			return
 		}
 
 		refreshToken, err := auth.GenerateRefreshToken()
 		if err != nil {
-			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf("Error creating token: %w ", err)))
+			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf("Error generating refreshtoken: %w ", err)))
 			return
 		}
 		refreshTokenExpiresAt := time.Now().Add(time.Hour * 24 * 7)
@@ -173,7 +173,7 @@ func Logout(db db.Db) http.HandlerFunc {
 		}
 
 		if err != nil {
-			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(err))
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf(" Error while decoding request body : %w", err)))
 			return
 		}
 
@@ -186,7 +186,7 @@ func Logout(db db.Db) http.HandlerFunc {
 		// deleting the token by userId from table
 		ok, err := db.DeleteTokenByHash(hash)
 		if err != nil {
-			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(err))
+			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf("Error when deleting token details: %w ", err)))
 			return
 		}
 

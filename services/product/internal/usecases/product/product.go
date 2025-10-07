@@ -35,7 +35,7 @@ func New(db db.Db) http.HandlerFunc {
 		}
 
 		if err != nil {
-			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(err))
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf(" Error while decoding request body : %w", err)))
 			return
 		}
 
@@ -47,12 +47,12 @@ func New(db db.Db) http.HandlerFunc {
 
 		id, err := db.CreateProduct(product.SKU, product.Name, product.Description, product.Price, product.Stock)
 		if err != nil {
-			response.WriteJson(writer, http.StatusInternalServerError, err)
+			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf(" Error creating product : %w", err)))
 			return
 		}
 
 		slog.Info(`CreateProduct :: Product created successfully :`, slog.String("id", id))
-		response.WriteJson(writer, http.StatusOK, map[string]string{"id": id})
+		response.WriteJson(writer, http.StatusOK, response.GeneralResponse(map[string]string{"id": id}))
 	}
 }
 
@@ -76,12 +76,11 @@ func ListProducts(db db.Db) http.HandlerFunc {
 		products, err := db.ListProducts(limit, offset)
 
 		if err != nil {
-			slog.Error("error getting products", err.Error())
-			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(err))
+			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf(" Error fetching products details : %w", err)))
 			return
 		}
 
-		response.WriteJson(writer, http.StatusOK, map[string][]entities.Product{"products": products})
+		response.WriteJson(writer, http.StatusOK, response.GeneralResponse(products))
 	}
 }
 
@@ -91,22 +90,22 @@ func DeleteProductById(db db.Db) http.HandlerFunc {
 
 		id := request.PathValue("id")
 		if id == "" {
-			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(nil))
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf(" product id is required")))
 			return
 		}
 
 		ok, err := db.DeleteProductById(id)
 		if err != nil {
-			response.WriteJson(writer, 500, response.GeneralError(err))
+			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf(" Error while decoding request body : %w", err)))
 			return
 		}
 
 		if !ok {
-			response.WriteJson(writer, 404, response.GeneralError(fmt.Errorf("product not found")))
+			response.WriteJson(writer, http.StatusNotFound, response.GeneralError(fmt.Errorf("product not found")))
 			return
 		}
 
-		response.WriteJson(writer, http.StatusNoContent, map[string]bool{"result": ok})
+		response.WriteJson(writer, http.StatusNoContent, response.GeneralResponse(true))
 	}
 }
 
@@ -115,7 +114,7 @@ func UpdateProductById(db db.Db) http.HandlerFunc {
 		slog.Info(`UpdateProductById :: start`)
 		id := request.PathValue("id")
 		if id == "" {
-			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(nil))
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf(" product id is required")))
 			return
 		}
 
@@ -127,7 +126,7 @@ func UpdateProductById(db db.Db) http.HandlerFunc {
 		}
 
 		if err != nil {
-			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(err))
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf(" Error while decoding request body : %w", err)))
 			return
 		}
 
@@ -149,20 +148,22 @@ func UpdateProductById(db db.Db) http.HandlerFunc {
 
 		result, err := db.UpdateProductById(id, product)
 		if err != nil {
-			response.WriteJson(writer, http.StatusBadRequest, map[string]interface{}{"error": err.Error(), "result": result})
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf(" Error updating product : %w", err)))
 			return
 		}
 
 		slog.Info(`UpdateProductById :: Product updated successfully :`, slog.String("id", id))
-		response.WriteJson(writer, http.StatusOK, map[string]interface{}{"id": id, "result": result})
+		response.WriteJson(writer, http.StatusOK, response.GeneralResponse(result))
 	}
 }
 
 func GetProductById(db db.Db) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		slog.Info(`GetProductById :: start`)
+
 		id := r.PathValue("id")
 		if id == "" {
-			response.WriteJson(w, http.StatusBadRequest, response.GeneralError(fmt.Errorf("missing id")))
+			response.WriteJson(w, http.StatusBadRequest, response.GeneralError(fmt.Errorf("product id is required")))
 			return
 		}
 		pr, err := db.GetProductById(id)
@@ -170,6 +171,7 @@ func GetProductById(db db.Db) http.HandlerFunc {
 			response.WriteJson(w, http.StatusNotFound, response.GeneralError(fmt.Errorf("product not found")))
 			return
 		}
-		response.WriteJson(w, http.StatusOK, pr)
+		slog.Info("GetProductById :: Product retrieved successfully :", pr)
+		response.WriteJson(w, http.StatusOK, response.GeneralResponse(pr))
 	}
 }

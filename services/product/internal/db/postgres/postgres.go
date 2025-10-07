@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"product/internal/config"
 	"product/internal/entities"
+	"strconv"
 	"strings"
 	"time"
 
@@ -49,8 +50,13 @@ func New(cfg *config.Config) (*Postgres, error) {
 
 	// Running migrations
 	if err := migrate.Run(db, embedMigrations, "."); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("migrations failed: %w", err)
+
+		if strings.Contains(err.Error(), "no migration files found") {
+			slog.Warn("migrations: none found; continuing")
+		} else {
+			_ = db.Close()
+			return nil, fmt.Errorf("migrations failed: %w", err)
+		}
 	}
 
 	return &Postgres{
@@ -59,6 +65,7 @@ func New(cfg *config.Config) (*Postgres, error) {
 }
 
 func (p *Postgres) CreateProduct(sku string, name string, description string, price float64, stock int64) (string, error) {
+	slog.Debug(`CreateProduct Db:: `, slog.String("sku", sku), slog.String("name", name), slog.String("description", description), slog.String("stock", strconv.FormatInt(int64(stock), 10)), slog.String("price", strconv.FormatFloat(price, 'f', -1, 64)))
 	var id string
 
 	err := p.Db.QueryRow(
@@ -76,6 +83,8 @@ func (p *Postgres) CreateProduct(sku string, name string, description string, pr
 }
 
 func (p *Postgres) ListProducts(limit int, offset int) ([]entities.Product, error) {
+	slog.Debug("ListProducts Db::", slog.String("limit", strconv.Itoa(limit)), slog.String("offset", strconv.Itoa(offset)))
+
 	rows, err := p.Db.Query("SELECT id, sku, name, description, price, stock, created_at, updated_at"+
 		" FROM products LIMIT $1 OFFSET $2", limit, offset)
 	if err != nil {
@@ -116,6 +125,7 @@ func scanProducts(rows *sql.Rows) ([]entities.Product, error) {
 }
 
 func (p *Postgres) DeleteProductById(id string) (bool, error) {
+	slog.Debug("DeleteProductById Db::", slog.String("id", id))
 	_, err := p.Db.Query(`DELETE FROM products where id=$1`, id)
 	if err != nil {
 		return false, err
@@ -125,6 +135,7 @@ func (p *Postgres) DeleteProductById(id string) (bool, error) {
 }
 
 func (p *Postgres) UpdateProductById(id string, detailsToUpdate map[string]interface{}) (bool, error) {
+	slog.Debug("UpdateProductById Db::", slog.String("id", id), slog.String("detailsToUpdate", fmt.Sprint(detailsToUpdate)))
 	if len(detailsToUpdate) == 0 {
 		return false, errors.New("no fields to update")
 	}
@@ -142,7 +153,6 @@ func (p *Postgres) UpdateProductById(id string, detailsToUpdate map[string]inter
 	placeholderCounter := 1
 
 	for key, value := range detailsToUpdate {
-		// Validate the field name against the valid columns
 		if !validColumns[key] {
 			return false, fmt.Errorf("invalid field: %s", key)
 		}
@@ -151,7 +161,6 @@ func (p *Postgres) UpdateProductById(id string, detailsToUpdate map[string]inter
 		placeholderCounter++
 	}
 
-	// Append `updated_at` for good measure, and handle its placeholder.
 	fields = append(fields, fmt.Sprintf("updated_at = $%d", placeholderCounter))
 	values = append(values, time.Now())
 	placeholderCounter++
@@ -174,6 +183,7 @@ func (p *Postgres) UpdateProductById(id string, detailsToUpdate map[string]inter
 }
 
 func (p *Postgres) GetProductById(id string) (entities.Product, error) {
+	slog.Debug("GetProductById Db::", slog.String("id", id))
 	var product entities.Product
 	err := p.Db.QueryRow("SELECT id, sku, name, description, price, stock, created_at, updated_at FROM products"+
 		" WHERE id=$1", id).Scan(&product.ID, &product.SKU, &product.Name, &product.Description, &product.Price,

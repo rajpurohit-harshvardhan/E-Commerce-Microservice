@@ -35,7 +35,7 @@ func New(db db.Db) http.HandlerFunc {
 		}
 
 		if err != nil {
-			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(err))
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf(" Error while decoding request body : %w", err)))
 			return
 		}
 
@@ -47,14 +47,14 @@ func New(db db.Db) http.HandlerFunc {
 
 		passwordHash, err := auth.CreateHash(user.Password)
 		if err != nil {
-			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(err))
+			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf(" Error genering hash : %w", err)))
 			return
 		}
 
 		id, err := db.CreateUser(user.Name, user.Email, passwordHash)
 		if err != nil {
-			slog.Error("Error while creating user: ", err)
-			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(err))
+
+			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf(" Error while creating user: %w", err)))
 			return
 		}
 
@@ -69,13 +69,13 @@ func DeleteUserById(db db.Db) http.HandlerFunc {
 
 		id := request.PathValue("id")
 		if id == "" {
-			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(nil))
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf(" userId is required")))
 			return
 		}
 
 		ok, err := db.DeleteUserById(id)
 		if err != nil {
-			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(err))
+			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf(" Error while deleting details : %w", err)))
 			return
 		}
 
@@ -94,7 +94,7 @@ func GetUserById(db db.Db) http.HandlerFunc {
 		slog.Info(`GetUserById :: Start`)
 		id := r.PathValue("id")
 		if id == "" {
-			response.WriteJson(w, http.StatusBadRequest, response.GeneralError(fmt.Errorf("missing id")))
+			response.WriteJson(w, http.StatusBadRequest, response.GeneralError(fmt.Errorf("userId is required")))
 			return
 		}
 
@@ -102,7 +102,7 @@ func GetUserById(db db.Db) http.HandlerFunc {
 
 		user, err := db.GetUserById(id)
 		if err != nil {
-			response.WriteJson(w, http.StatusNotFound, response.GeneralError(fmt.Errorf("user not found: %w", err)))
+			response.WriteJson(w, http.StatusNotFound, response.GeneralError(fmt.Errorf(" Error when deleting details: %w", err)))
 			return
 		}
 
@@ -118,7 +118,7 @@ func UpdateUserById(db db.Db) http.HandlerFunc {
 		slog.Info(`UpdateUserById :: start`)
 		id := request.PathValue("id")
 		if id == "" {
-			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(nil))
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf("userId is required")))
 			return
 		}
 
@@ -130,7 +130,7 @@ func UpdateUserById(db db.Db) http.HandlerFunc {
 		}
 
 		if err != nil {
-			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(err))
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf(" Error while decoding request body : %w", err)))
 			return
 		}
 
@@ -157,7 +157,7 @@ func UpdateUserById(db db.Db) http.HandlerFunc {
 
 			hashPassword, err1 := auth.CreateHash(passwordString)
 			if err1 != nil {
-				response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(err1))
+				response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf(" Error creating hash : %w", err1)))
 				return
 			}
 			detailsToUpdate["password_hash"] = hashPassword
@@ -165,11 +165,11 @@ func UpdateUserById(db db.Db) http.HandlerFunc {
 
 		result, err := db.UpdateUserById(id, detailsToUpdate)
 		if err != nil {
-			response.WriteJson(writer, http.StatusBadRequest, map[string]interface{}{"error": err.Error(), "result": result})
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf(" Error while updating details: %w", err)))
 			return
 		}
 
 		slog.Info(`UpdateUserById :: user updated successfully :`, slog.String("id", id))
-		response.WriteJson(writer, http.StatusOK, map[string]interface{}{"id": id, "result": result})
+		response.WriteJson(writer, http.StatusOK, response.GeneralResponse(result))
 	}
 }

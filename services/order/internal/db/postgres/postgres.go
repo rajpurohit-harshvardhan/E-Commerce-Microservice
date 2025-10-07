@@ -50,8 +50,13 @@ func New(cfg *config.Config) (*Postgres, error) {
 
 	// Running migrations
 	if err := migrate.Run(db, embedMigrations, "."); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("migrations failed: %w", err)
+
+		if strings.Contains(err.Error(), "no migration files found") {
+			slog.Warn("migrations: none found; continuing")
+		} else {
+			_ = db.Close()
+			return nil, fmt.Errorf("migrations failed: %w", err)
+		}
 	}
 
 	return &Postgres{
@@ -60,6 +65,7 @@ func New(cfg *config.Config) (*Postgres, error) {
 }
 
 func (p *Postgres) CreateOrder(userId string, status string, total float64) (string, error) {
+	slog.Debug("CreateOrder DB ::", slog.String("userId", userId), slog.String("status", status), slog.String("total", fmt.Sprint(total)))
 	var id string
 
 	err := p.Db.QueryRow(
@@ -74,6 +80,7 @@ func (p *Postgres) CreateOrder(userId string, status string, total float64) (str
 }
 
 func (p *Postgres) CreateOrderItems(orderItems []entities.OrderItem) (bool, error) {
+	slog.Debug("CreateOrderItems DB ::", slog.String("orderItems", fmt.Sprint(orderItems)))
 	if len(orderItems) == 0 {
 		return false, nil // Nothing to insert
 	}
@@ -99,6 +106,7 @@ func (p *Postgres) CreateOrderItems(orderItems []entities.OrderItem) (bool, erro
 }
 
 func (p *Postgres) DeleteOrderById(id string) (bool, error) {
+	slog.Debug("DeleteOrderById DB ::", slog.String("id", id))
 	result, err := p.Db.Exec(`DELETE FROM orders where id=$1`, id)
 	if err != nil {
 		return false, err
@@ -114,6 +122,7 @@ func (p *Postgres) DeleteOrderById(id string) (bool, error) {
 }
 
 func (p *Postgres) GetOrderById(id string) (entities.Order, error) {
+	slog.Debug("GetOrderById DB ::", slog.String("id", id))
 	var order entities.Order
 	err := p.Db.QueryRow("SELECT id, user_id, status, total, created_at, updated_at FROM orders WHERE id=$1",
 		id).Scan(&order.ID, &order.UserId, &order.Status, &order.Total, &order.CreatedAt, &order.UpdatedAt)
@@ -124,6 +133,7 @@ func (p *Postgres) GetOrderById(id string) (entities.Order, error) {
 }
 
 func (p *Postgres) GetOrderItemsByOrderId(orderId string) ([]entities.OrderItem, error) {
+	slog.Debug("GetOrderItemsByOrderId DB ::", slog.String("orderId", orderId))
 	orderItem := []entities.OrderItem{}
 
 	rows, err := p.Db.Query("SELECT id, order_id, product_id, quantity, price FROM order_items WHERE order_id=$1",
@@ -163,6 +173,7 @@ func scanOrderItems(rows *sql.Rows) ([]entities.OrderItem, error) {
 }
 
 func (p *Postgres) ListOrders(limit int, offset int) ([]entities.OrderDetails, error) {
+	slog.Debug("ListOrders DB :: ", slog.String("limit", fmt.Sprint(limit)), ", offset", fmt.Sprint(offset))
 	rows, err := p.Db.Query(`SELECT
        o.id, o.user_id, o.status, o.total, o.created_at, o.updated_at,
        oi.id as "itemId", oi.order_id, oi.product_id, oi.quantity, oi.price
@@ -223,6 +234,8 @@ func scanOrderDetails(rows *sql.Rows) ([]entities.OrderDetails, error) {
 }
 
 func (p *Postgres) DeleteOrderItemsByOrderId(orderId string) (bool, error) {
+	slog.Debug("DeleteOrderItemsByOrderId DB ::", slog.String("orderId", orderId))
+
 	result, err := p.Db.Exec(`DELETE FROM order_items where order_id=$1`, orderId)
 	if err != nil {
 		return false, err
@@ -238,6 +251,7 @@ func (p *Postgres) DeleteOrderItemsByOrderId(orderId string) (bool, error) {
 }
 
 func (p *Postgres) UpdateOrderById(id string, detailsToUpdate map[string]interface{}) (bool, error) {
+	slog.Debug("UpdateOrderById DB ::", slog.String("id", id), slog.String("detailsToUpdate", fmt.Sprint(detailsToUpdate)))
 	if len(detailsToUpdate) == 0 {
 		return false, errors.New("no fields to update")
 	}

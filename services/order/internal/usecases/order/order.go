@@ -1,6 +1,7 @@
 package order
 
 import (
+	"common/utils/http/middleware"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -29,9 +30,11 @@ func New(db db.Db) http.HandlerFunc {
 	return func(writer http.ResponseWriter, request *http.Request) {
 		slog.Info(`CreateOrder :: start`)
 
-		userId := request.Header.Get("x-user-id")
-		if userId == "" {
-			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf("Missing User Id")))
+		ctx := request.Context()
+		userId, ok := ctx.Value(middleware.CtxUserID).(string)
+
+		if !ok || userId == "" {
+			http.Error(writer, "Authentication context missing User ID", http.StatusInternalServerError)
 			return
 		}
 
@@ -44,7 +47,7 @@ func New(db db.Db) http.HandlerFunc {
 		}
 
 		if err != nil {
-			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(err))
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf(" Error while decoding request body : %w", err)))
 			return
 		}
 
@@ -61,8 +64,7 @@ func New(db db.Db) http.HandlerFunc {
 
 		id, err := db.CreateOrder(userId, "CONFIRMED", total)
 		if err != nil {
-			slog.Error("Error while creating auth: ", err)
-			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(err))
+			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf(" Error creating order: %w", err)))
 			return
 		}
 
@@ -78,14 +80,12 @@ func New(db db.Db) http.HandlerFunc {
 
 		result, err := db.CreateOrderItems(orderItems)
 		if err != nil {
-			slog.Error("Error while creating auth items: ", err)
-			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(err))
+			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf(" Error creating order items: %w", err)))
 			return
 		}
 
 		if !result {
-			slog.Error("Error : No auth items provided: ", err)
-			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf(`no auth items provided`)))
+			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf(`no order items provided`)))
 			return
 		}
 
@@ -115,8 +115,7 @@ func ListOrders(db db.Db) http.HandlerFunc {
 		orders, err := db.ListOrders(limit, offset)
 
 		if err != nil {
-			slog.Error("error getting orders", err.Error())
-			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(err))
+			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf("error getting orders: %w", err)))
 			return
 		}
 		slog.Info(`ListOrders :: End`)
@@ -130,18 +129,18 @@ func DeleteOrderById(db db.Db) http.HandlerFunc {
 
 		id := request.PathValue("id")
 		if id == "" {
-			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(nil))
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf("order id is required")))
 			return
 		}
 
 		ok, err := db.DeleteOrderById(id)
 		if err != nil {
-			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(err))
+			response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf(" Error deleting order: %w", err)))
 			return
 		}
 
 		if !ok {
-			response.WriteJson(writer, http.StatusNotFound, response.GeneralError(fmt.Errorf("auth not found")))
+			response.WriteJson(writer, http.StatusNotFound, response.GeneralError(fmt.Errorf(" No order found")))
 			return
 		}
 
@@ -155,7 +154,7 @@ func GetOrderById(db db.Db) http.HandlerFunc {
 		slog.Info(`GetOrderById :: Start`)
 		id := r.PathValue("id")
 		if id == "" {
-			response.WriteJson(w, http.StatusBadRequest, response.GeneralError(fmt.Errorf("missing id")))
+			response.WriteJson(w, http.StatusBadRequest, response.GeneralError(fmt.Errorf("order id is required")))
 			return
 		}
 
@@ -163,13 +162,13 @@ func GetOrderById(db db.Db) http.HandlerFunc {
 
 		order, err := db.GetOrderById(id)
 		if err != nil {
-			response.WriteJson(w, http.StatusNotFound, response.GeneralError(fmt.Errorf("order not found")))
+			response.WriteJson(w, http.StatusNotFound, response.GeneralError(fmt.Errorf("order not found: %w", err)))
 			return
 		}
 
 		orderItems, err := db.GetOrderItemsByOrderId(id)
 		if err != nil {
-			response.WriteJson(w, http.StatusNotFound, response.GeneralError(fmt.Errorf("Order items not found")))
+			response.WriteJson(w, http.StatusNotFound, response.GeneralError(fmt.Errorf(" no items in order found")))
 			return
 		}
 
@@ -186,7 +185,7 @@ func UpdateOrderById(db db.Db) http.HandlerFunc {
 		slog.Info(`UpdateOrderById :: start`)
 		id := request.PathValue("id")
 		if id == "" {
-			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(nil))
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf("order id is required")))
 		}
 
 		var order map[string]interface{}
@@ -197,7 +196,7 @@ func UpdateOrderById(db db.Db) http.HandlerFunc {
 		}
 
 		if err != nil {
-			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(err))
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(fmt.Errorf(" Error while decoding request body : %w", err)))
 			return
 		}
 
@@ -209,7 +208,6 @@ func UpdateOrderById(db db.Db) http.HandlerFunc {
 		type OrderItemsToUpdate = entities.CreateOrderRequestInputItems
 		var OrderItemsToCreate []entities.OrderItem
 		if v, ok := order["items"]; ok {
-			// calculate total based on the current items in the body
 			if items, ok := v.([]OrderItemsToUpdate); ok {
 				total := 0.0
 				for _, orderItem := range items {
@@ -224,29 +222,24 @@ func UpdateOrderById(db db.Db) http.HandlerFunc {
 
 				detailsToUpdate["total"] = total
 
-				// delete all the auth items
 				_, err := db.DeleteOrderItemsByOrderId(id)
 				if err != nil {
-					response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(err))
+					response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf(" Error deleting order items: %w", err)))
 					return
 				}
 
-				// create all the auth items
 				_, err = db.CreateOrderItems(OrderItemsToCreate)
 				if err != nil {
-					response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(err))
+					response.WriteJson(writer, http.StatusInternalServerError, response.GeneralError(fmt.Errorf(" Error creating order items: %w", err)))
 					return
 				}
 
-			} else {
-				// log or return error
-				slog.Info("No auth items provided. Only updating status")
 			}
 		}
 
 		result, err := db.UpdateOrderById(id, detailsToUpdate)
 		if err != nil {
-			response.WriteJson(writer, http.StatusBadRequest, map[string]interface{}{"error": err.Error(), "result": result})
+			response.WriteJson(writer, http.StatusBadRequest, response.GeneralError(err))
 			return
 		}
 

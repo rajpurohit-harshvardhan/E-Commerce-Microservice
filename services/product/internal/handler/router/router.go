@@ -15,11 +15,11 @@ func SetupRouter(db db.Db) *http.ServeMux {
 	router.HandleFunc("GET /health-check", product.HealthCheck())
 
 	authOnly := middleware.Authenticated
-	router.Handle("POST /v1/product", authOnly(product.New(db)))
-	router.Handle("GET /v1/product/list", authOnly(product.ListProducts(db)))
-	router.Handle("GET /v1/product/{id}", authOnly(product.GetProductById(db)))
-	router.Handle("DELETE /v1/product/{id}", authOnly(product.DeleteProductById(db)))
-	router.Handle("PUT /v1/product/{id}", authOnly(product.UpdateProductById(db)))
+	router.Handle("POST /api/v1/products", authOnly(product.New(db)))
+	router.Handle("GET /api/v1/products/list", authOnly(product.ListProducts(db)))
+	router.Handle("GET /api/v1/products/{id}", authOnly(product.GetProductById(db)))
+	router.Handle("DELETE /api/v1/products/{id}", authOnly(product.DeleteProductById(db)))
+	router.Handle("PUT /api/v1/products/{id}", authOnly(product.UpdateProductById(db)))
 
 	return router
 }
